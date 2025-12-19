@@ -1,38 +1,56 @@
 from __future__ import annotations
-from datetime import datetime
+
 from pathlib import Path
+from datetime import datetime
+from typing import Iterable
 
-def render_spec(out_path: Path, repo_path: Path, top_files: list[str], hits: list[dict]) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+from app.retrieve import Hit
 
-    lines = []
-    lines.append(f"# 仕様書（自動生成）")
-    lines.append("")
-    lines.append(f"- 対象リポジトリ: `{repo_path}`")
-    lines.append(f"- 生成日時: {datetime.now().isoformat(timespec='seconds')}")
-    lines.append("")
-    lines.append("## 1. 目的")
-    lines.append("このドキュメントは、コードベースをスキャンして推定した仕様のたたき台です。")
-    lines.append("")
-    lines.append("## 2. 主要ファイル（候補）")
-    for p in top_files[:10]:
-        lines.append(f"- `{p}`")
-    lines.append("")
-    lines.append("## 3. 検索結果（Evidence）")
+def render_spec(out: Path, repo: Path, top_files: list[str], hits: list[Hit], query: str) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    lines: list[str] = []
+
+    lines += [
+        "# Spec (draft)",
+        "",
+        f"- Generated: {now}",
+        f"- Repo: `{repo}`",
+        f"- Query: `{query}`",
+        "",
+        "## Overview",
+        "This document is automatically generated from the repository contents.",
+        "It lists candidate important files and evidence snippets found by keyword search.",
+        "",
+        "## Candidate important files (first 50)",
+    ]
+    for f in top_files:
+        lines.append(f"- `{f}`")
+
+    lines += [
+        "",
+        "## Evidence (keyword hits)",
+        "Each hit includes file path, line number, and surrounding context.",
+        "",
+    ]
+
     if not hits:
-        lines.append("- （ヒットなし）")
+        lines += [
+            "_No hits found._",
+            "",
+        ]
     else:
-        for h in hits:
-            lines.append(f"- `{h['path']}`: {h['snippet']}")
-    lines.append("")
-    lines.append("## 4. Mermaid（仮）")
-    lines.append("```mermaid")
-    lines.append("flowchart LR")
-    lines.append("  User-->CLI[code2spec CLI]")
-    lines.append("  CLI-->Scan[Scan repo]")
-    lines.append("  Scan-->Search[Search]")
-    lines.append("  Search-->Spec[Generate spec.md]")
-    lines.append("```")
-    lines.append("")
+        for i, h in enumerate(hits, start=1):
+            lines += [
+                f"### Hit {i}",
+                f"- File: `{h.path}`",
+                f"- Line: `{h.line_no}`",
+                "",
+                "```text",
+                h.context,
+                "```",
+                "",
+            ]
 
-    out_path.write_text("\n".join(lines), encoding="utf-8")
+    out.write_text("\n".join(lines), encoding="utf-8")

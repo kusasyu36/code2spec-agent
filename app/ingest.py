@@ -1,39 +1,70 @@
 from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 DEFAULT_EXCLUDE_DIRS = {
-    ".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache",
-    "dist", "build", ".next", ".cache"
-}
-DEFAULT_EXCLUDE_EXTS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".pdf", ".zip", ".tar", ".gz", ".7z",
-    ".pt", ".pth", ".ckpt", ".onnx", ".bin", ".dylib", ".so"
+    ".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
+    "node_modules", "dist", "build", ".DS_Store"
 }
 
-def iter_text_files(repo: Path,
-                    exclude_dirs=DEFAULT_EXCLUDE_DIRS,
-                    exclude_exts=DEFAULT_EXCLUDE_EXTS,
-                    max_bytes: int = 400_000) -> list[Path]:
-    repo = repo.resolve()
-    files: list[Path] = []
-    for p in repo.rglob("*"):
-        if p.is_dir():
-            continue
-        rel_parts = set(p.relative_to(repo).parts)
-        if any(d in rel_parts for d in exclude_dirs):
-            continue
-        if p.suffix.lower() in exclude_exts:
-            continue
-        try:
-            if p.stat().st_size > max_bytes:
-                continue
-        except FileNotFoundError:
-            continue
-        files.append(p)
-    return sorted(files)
+DEFAULT_TEXT_EXTS = {
+    ".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml",
+    ".ini", ".cfg", ".sh", ".bash", ".zsh", ".js", ".ts",
+    ".html", ".css", ".env", ".example"
+}
 
-def read_file(path: Path, encoding: str = "utf-8") -> str:
+def _is_under_excluded_dir(path: Path, repo: Path, exclude_dirs: set[str]) -> bool:
     try:
-        return path.read_text(encoding=encoding, errors="ignore")
+        rel = path.relative_to(repo)
+    except ValueError:
+        return True
+    parts = set(rel.parts)
+    return any(d in parts for d in exclude_dirs)
+
+def _looks_text_file(path: Path, max_bytes: int, allow_exts: set[str] | None) -> bool:
+    if not path.is_file():
+        return False
+    if path.stat().st_size > max_bytes:
+        return False
+    if allow_exts is not None and path.suffix.lower() not in allow_exts:
+        return False
+    # 軽いテキスト判定：先頭だけUTF-8で読めるか
+    try:
+        with path.open("rb") as f:
+            head = f.read(4096)
+        head.decode("utf-8")
+        return True
     except Exception:
-        return ""
+        return False
+
+def iter_text_files(
+    repo: Path,
+    *,
+    max_files: int = 5000,
+    max_bytes: int = 1_000_000,
+    exclude_dirs: set[str] | None = None,
+    allow_exts: set[str] | None = None,
+) -> list[Path]:
+    """
+    Collect text-like files under repo.
+    - exclude_dirs: directories to skip
+    - allow_exts: if provided, only these extensions are included
+    """
+    repo = repo.resolve()
+    exclude_dirs = exclude_dirs or set(DEFAULT_EXCLUDE_DIRS)
+    allow_exts = allow_exts  # None = accept any ext (but still text-decodable)
+
+    results: list[Path] = []
+    for p in repo.rglob("*"):
+        if len(results) >= max_files:
+            break
+        if _is_under_excluded_dir(p, repo, exclude_dirs):
+            continue
+        if _looks_text_file(p, max_bytes=max_bytes, allow_exts=allow_exts):
+            results.append(p)
+
+    # 安定して再現できるようにソート
+    results.sort()
+    return results
