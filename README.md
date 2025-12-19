@@ -1,12 +1,16 @@
 # code2spec-agent
 
-Generate a draft spec (Markdown) from a code repository with evidence snippets.
+Generate a draft specification (`spec.md`) from an existing repository by:
+1) listing important files (first 50 text files), and
+2) collecting evidence by keyword search.
 
-## Quickstart
+## Requirements
+- Python 3.x
+
+## Setup (macOS)
 ```bash
+git clone https://github.com/kusasyu36/code2spec-agent.git
+cd code2spec-agent
 python -m venv .venv
 source .venv/bin/activate
-pip install -U pip
-pip install python-dotenv rich
-
-python -m app.main --repo . --out docs/spec.md --query "import"
+pip install -r requirements.txt
