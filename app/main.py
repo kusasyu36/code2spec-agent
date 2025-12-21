@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 import argparse
 from pathlib import Path
 
 from app.ingest import iter_text_files, DEFAULT_TEXT_EXTS, DEFAULT_EXCLUDE_DIRS
 from app.retrieve import search_files
 from app.render import render_spec
+from app.summarize import summarize_hits
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -17,8 +20,12 @@ def main():
     ap.add_argument("--max-files", type=int, default=5000, help="Max files to scan")
     ap.add_argument("--max-bytes", type=int, default=1_000_000, help="Max file size to read")
 
-    # デフォルトは「よくあるテキスト拡張子」に限定（速い）
     ap.add_argument("--all-exts", action="store_true", help="Scan any file that decodes as UTF-8 (slower)")
+
+    # LLM summary
+    ap.add_argument("--llm", action="store_true", help="Add LLM summary section")
+    ap.add_argument("--llm-model", type=str, default="gemini-2.5-flash", help="Gemini model name for summary")
+
     args = ap.parse_args()
 
     repo = Path(args.repo).expanduser().resolve()
@@ -44,8 +51,13 @@ def main():
         repo_root=repo,
     )
 
-    render_spec(out, repo, top_files, hits, query=args.query)
+    llm_summary_md = None
+    if args.llm:
+        llm_summary_md = summarize_hits(hits, query=args.query, model=args.llm_model)
+
+    render_spec(out, repo, top_files, hits, query=args.query, llm_summary_md=llm_summary_md)
     print(f"[OK] spec generated: {out}")
+
 
 if __name__ == "__main__":
     main()

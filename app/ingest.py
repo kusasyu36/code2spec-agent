@@ -6,7 +6,8 @@ from typing import Iterable
 
 DEFAULT_EXCLUDE_DIRS = {
     ".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache",
-    "node_modules", "dist", "build", ".DS_Store"
+    "node_modules", "dist", "build", ".DS_Store",
+    "docs",
 }
 
 DEFAULT_TEXT_EXTS = {
